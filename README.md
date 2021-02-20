@@ -18,8 +18,12 @@ written with nodejs v12.18.1
       baseUrl: 'usps url goes here'
     })
 
-    const matches = USPSWeb.address.validate({
+    USPSWeb.address.validate({
       streetAddress1: '1600 pennsylvania ave',
       city: 'washington',
       state: 'dc'
+    }).then((results) => {
+      for (const result of results) {
+        console.log(result);
+      }
     });

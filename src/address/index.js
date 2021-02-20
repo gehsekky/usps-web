@@ -1,40 +1,55 @@
 const xmljs = require('xml-js');
 const fetch = require('node-fetch');
-const config = require('config');
 
 class Address {
+  constructor(uspsWebContext) {
+    this.uspsWeb = uspsWebContext;
+  }
+
   /**
    * validates address
    * @param {object} address
    */
-  static validate(address) {
+  validate(addresses) {
     const query = {
       AddressValidateRequest: {
         _attributes: {
-          USERID: config.get('userId')
+          USERID: this.uspsWeb.userId
         },
-        Address: {
-          Address1: {
-            _text: address.streetAddress2 || ''
-          },
-          Address2: {
-            _text: address.streetAddress1
-          },
-          City: {
-            _text: address.city
-          },
-          State: {
-            _text: address.state
-          },
-          Zip5: {
-            _text: address.zip5 || ''
-          },
-          Zip4: {
-            _text: address.zip4 || ''
-          }
-        }
+        Address: []
       }
     };
+
+    if (!Array.isArray(addresses)) {
+      addresses = [addresses];
+    }
+
+    for (let addressCounter = 0; addressCounter < addresses.length; addressCounter++) {
+      const address = addresses[addressCounter];
+      query.AddressValidateRequest.Address.push({
+        _attributes: {
+          ID: `${addressCounter}`
+        },
+        Address1: {
+          _text: address.streetAddress2 || ''
+        },
+        Address2: {
+          _text: address.streetAddress1
+        },
+        City: {
+          _text: address.city
+        },
+        State: {
+          _text: address.state
+        },
+        Zip5: {
+          _text: address.zip5 || ''
+        },
+        Zip4: {
+          _text: address.zip4 || ''
+        }
+      })
+    }
 
     const queryOptions = {
       compact: true,
@@ -43,22 +58,32 @@ class Address {
       ignoreDoctype: true
     };
 
-    return fetch(config.get('usps.baseUrl') + '/ShippingAPI.dll?API=Verify&XML=' + xmljs.js2xml(query, queryOptions))
+    return fetch(this.uspsWeb.baseUrl + '/ShippingAPI.dll?API=Verify&XML=' + xmljs.js2xml(query, queryOptions))
     .then((raw) => raw.text())
     .then((xml) => {
-      const validatedAddress = xmljs.xml2js(xml, {
+      const response = xmljs.xml2js(xml, {
         compact: true,
         ignoreDeclaration: true
       });
 
-      return {
-        streetAddress1: validatedAddress.AddressValidateResponse.Address.Address2._text,
-        streetAddress2: validatedAddress.AddressValidateResponse.Address.Address1 ? validatedAddress.AddressValidateResponse.Address.Address1._text : '',
-        city: validatedAddress.AddressValidateResponse.Address.City._text,
-        state: validatedAddress.AddressValidateResponse.Address.State._text,
-        zip5: validatedAddress.AddressValidateResponse.Address.Zip5._text,
-        zip4: validatedAddress.AddressValidateResponse.Address.Zip4._text
-      };
+      let responseAddresses = response.AddressValidateResponse.Address;
+      if (!Array.isArray(responseAddresses)) {
+        responseAddresses = [responseAddresses];
+      }
+
+      const validatedAddresses = [];
+      for (const validatedAddress of responseAddresses) {
+        validatedAddresses.push({
+          streetAddress1: validatedAddress.Address2._text,
+          streetAddress2: validatedAddress.Address1 ? validatedAddress.Address1._text : '',
+          city: validatedAddress.City._text,
+          state: validatedAddress.State._text,
+          zip5: validatedAddress.Zip5._text,
+          zip4: validatedAddress.Zip4._text || ''
+        });
+      }
+
+      return validatedAddresses;
     })
     .catch((err) => {
       console.error(err);

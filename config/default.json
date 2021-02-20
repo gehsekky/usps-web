@@ -1,0 +1,6 @@
+{
+  "userId": "12345",
+  "usps": {
+    "baseUrl": "https://secure.shippingapis.com"
+  }
+}
